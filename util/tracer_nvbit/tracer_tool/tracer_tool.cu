@@ -82,7 +82,7 @@ std::unordered_map<CUcontext, FILE*> ctx_resultsFile;
 
 /* kernel instruction counter, updated by the GPU */
 uint64_t dynamic_kernel_limit_start =
-    0;                                 // 0 means start from the begging kernel
+    0;                                 // 0 means start from the beginning kernel
 uint64_t dynamic_kernel_limit_end = 0; // 0 means no limit
 
 enum address_format { list_all = 0, base_stride = 1, base_delta = 2 };
@@ -353,7 +353,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
       cuMemcpyHtoD_v2_params *p = (cuMemcpyHtoD_v2_params *)params;
       char buffer[1024];
       kernelsFile = fopen(ctx_kernelslist[ctx].c_str(), "a");
-      sprintf(buffer, "MemcpyHtoD,0x%016lx,%lld", p->dstDevice, p->ByteCount);
+      sprintf(buffer, "MemcpyHtoD,0x%016llx,%lx", p->dstDevice, p->ByteCount);
       fprintf(kernelsFile, buffer);
       fprintf(kernelsFile, "\n");
       fclose(kernelsFile);
@@ -691,11 +691,11 @@ void *recv_thread_fun(void *args) {
 
           if (base_stride_success && enable_compress) {
             // base + stride format
-            fprintf(ctx_resultsFile[ctx], "%u 0x%llx %d ", address_format::base_stride,
+            fprintf(ctx_resultsFile[ctx], "%u 0x%lx %d ", address_format::base_stride,
                     base_addr, stride);
           } else if (!base_stride_success && enable_compress) {
             // base + delta format
-            fprintf(ctx_resultsFile[ctx], "%u 0x%llx ", address_format::base_delta,
+            fprintf(ctx_resultsFile[ctx], "%u 0x%lx ", address_format::base_delta,
                     base_addr);
             for (int s = 0; s < deltas.size(); s++) {
               fprintf(ctx_resultsFile[ctx], "%lld ", deltas[s]);
@@ -713,7 +713,7 @@ void *recv_thread_fun(void *args) {
         }
 
         // Print the immediate
-        fprintf(ctx_resultsFile[ctx], "%d ", ma->imm);
+        fprintf(ctx_resultsFile[ctx], "%lx ", ma->imm);
 
         fprintf(ctx_resultsFile[ctx], "\n");
 
