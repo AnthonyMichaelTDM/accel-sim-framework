@@ -176,6 +176,16 @@ void nvbit_at_init() {
   std::string pad(100, '-');
   printf("%s\n", pad.c_str());
 
+  // detect if the user has sourced the gpgpu-sim environment, if they have then
+  // we should exit early with an error message because the tool will not work
+  // with gpgpu-sim
+  if (std::getenv("GPGPUSIM_SETUP_ENVIRONMENT_WAS_RUN")) {
+    std::cerr << "Error: gpgpu-sim environment detected, this tool is not "
+                 "compatible with gpgpu-sim"
+              << std::endl;
+    exit(1);
+  }
+
   // parse the kernel regions, if any
   // and check if they are valid
   if (!raw_kernel_regions.empty()) {
