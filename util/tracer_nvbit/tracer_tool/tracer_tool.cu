@@ -75,7 +75,7 @@ std::string stats_location = cwd + "/traces/stats.csv";
 
 /* kernel instruction counter, updated by the GPU */
 uint64_t dynamic_kernel_limit_start =
-    0;                                 // 0 means start from the begging kernel
+    0;                                 // 0 means start from the beginning kernel
 uint64_t dynamic_kernel_limit_end = 0; // 0 means no limit
 
 enum address_format { list_all = 0, base_stride = 1, base_delta = 2 };
@@ -147,7 +147,7 @@ void instrument_function_if_needed(CUcontext ctx, CUfunction func) {
     const std::vector<Instr *> &instrs = nvbit_get_instrs(ctx, f);
     if (verbose) {
       printf("Inspecting function %s at address 0x%lx\n",
-             nvbit_get_func_name(ctx, f), nvbit_get_func_addr(f), true);
+             nvbit_get_func_name(ctx, f), nvbit_get_func_addr(f));
     }
 
     uint32_t cnt = 0;
@@ -355,7 +355,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
       cuMemcpyHtoD_v2_params *p = (cuMemcpyHtoD_v2_params *)params;
       char buffer[1024];
       kernelsFile = fopen(kernelslist_location.c_str(), "a");
-      sprintf(buffer, "MemcpyHtoD,0x%016lx,%lld", p->dstDevice, p->ByteCount);
+      sprintf(buffer, "MemcpyHtoD,0x%016llx,%lx", p->dstDevice, p->ByteCount);
       fprintf(kernelsFile, buffer);
       fprintf(kernelsFile, "\n");
       fclose(kernelsFile);
@@ -690,11 +690,11 @@ void *recv_thread_fun(void *) {
 
           if (base_stride_success && enable_compress) {
             // base + stride format
-            fprintf(resultsFile, "%u 0x%llx %d ", address_format::base_stride,
+            fprintf(resultsFile, "%u 0x%lx %d ", address_format::base_stride,
                     base_addr, stride);
           } else if (!base_stride_success && enable_compress) {
             // base + delta format
-            fprintf(resultsFile, "%u 0x%llx ", address_format::base_delta,
+            fprintf(resultsFile, "%u 0x%lx ", address_format::base_delta,
                     base_addr);
             for (int s = 0; s < deltas.size(); s++) {
               fprintf(resultsFile, "%lld ", deltas[s]);
@@ -712,7 +712,7 @@ void *recv_thread_fun(void *) {
         }
 
         // Print the immediate
-        fprintf(resultsFile, "%d ", ma->imm);
+        fprintf(resultsFile, "%lx ", ma->imm);
 
         fprintf(resultsFile, "\n");
 
