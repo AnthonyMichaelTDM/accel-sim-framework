@@ -73,6 +73,54 @@ std::string traces_location = cwd + "/traces/";
 std::string kernelslist_location = cwd + "/traces/kernelslist";
 std::string stats_location = cwd + "/traces/stats.csv";
 
+/* datastructures that support setting kernel regions of interest */
+struct KernelRegion {
+  uint64_t start;
+  uint64_t end;
+};
+// the kernel regions are defined in the format of start-end, and must be ordered such that the earliest range is first,
+// overlapping ranges are not allowed.
+std::vector<KernelRegion> kernel_regions;
+
+void parse_kernel_regions(std::string raw_kernel_regions) {
+  std::istringstream iss(raw_kernel_regions);
+  std::string token;
+  while (std::getline(iss, token, ',')) {
+    std::istringstream iss2(token);
+    std::string token2;
+    std::vector<std::string> tokens;
+    while (std::getline(iss2, token2, '-')) {
+      if (!token2.empty())
+        tokens.push_back(token2);
+    }
+    if (tokens.size() != 2) {
+      std::cerr << "Error: invalid kernel region format: " << token << std::endl;
+      exit(1);
+    }
+    KernelRegion region;
+    region.start = std::stoull(tokens[0]);
+    region.end = std::stoull(tokens[1]);
+    kernel_regions.push_back(region);
+  }
+}
+
+bool are_kernel_regions_valid() {
+  for (int i = 0; i < kernel_regions.size(); i++) {
+    if (kernel_regions[i].start > kernel_regions[i].end) {
+      return false;
+    }
+    if (i > 0 && kernel_regions[i].start <= kernel_regions[i - 1].end) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool is_in_kernel_region(int kernelid, KernelRegion &current_region) {
+  return kernelid >= current_region.start && kernelid <= current_region.end;
+}
+
 /* kernel instruction counter, updated by the GPU */
 uint64_t dynamic_kernel_limit_start =
     0;                                 // 0 means start from the beginning kernel
@@ -81,6 +129,8 @@ uint64_t dynamic_kernel_limit_end = 0; // 0 means no limit
 enum address_format { list_all = 0, base_stride = 1, base_delta = 2 };
 
 void nvbit_at_init() {
+  std::string raw_kernel_regions;
+
   setenv("CUDA_MANAGED_FORCE_DEVICE_ALLOC", "1", 1);
   GET_VAR_INT(
       instr_begin_interval, "INSTR_BEGIN", 0,
@@ -93,6 +143,13 @@ void nvbit_at_init() {
               "Include source code line info at the start of each traced line. "
               "The target binary must be compiled with -lineinfo or "
               "--generate-line-info");
+
+  GET_VAR_STR(raw_kernel_regions, "DYNAMIC_KERNEL_REGIONS",
+              "List of ranges of kernel ids to be traced, in the format of "
+              "start1-end1,start2-end2,... (inclusive). "
+              "The ranges must be ordered such that the earliest range is first,"
+              "and overlapping ranges are not allowed");
+
   GET_VAR_INT(dynamic_kernel_limit_end, "DYNAMIC_KERNEL_LIMIT_END", 0,
               "Limit of the number kernel to be printed, 0 means no limit");
   GET_VAR_INT(dynamic_kernel_limit_start, "DYNAMIC_KERNEL_LIMIT_START", 0,
@@ -119,6 +176,19 @@ void nvbit_at_init() {
   std::string pad(100, '-');
   printf("%s\n", pad.c_str());
 
+  // parse the kernel regions, if any
+  // and check if they are valid
+  if (!raw_kernel_regions.empty()) {
+    parse_kernel_regions(raw_kernel_regions);
+    if (!are_kernel_regions_valid()) {
+      std::cerr << "Error: invalid kernel regions" << std::endl
+                << "Invalid kernel regions: " << raw_kernel_regions << std::endl
+                << "Kernel regions must be ordered such that the earliest range is first, and overlapping ranges are not allowed" << std::endl
+                << "Example of valid kernel regions: 1-10,20-30,40-50" << std::endl;
+      exit(1);
+    }
+  }
+
   if (active_from_start == 0) {
     active_region = false;
   }
@@ -130,6 +200,8 @@ std::unordered_set<CUfunction> already_instrumented;
 /* instrument each memory instruction adding a call to the above instrumentation
  * function */
 void instrument_function_if_needed(CUcontext ctx, CUfunction func) {
+  printf("Instrumenting function");
+
   std::vector<CUfunction> related_functions =
       nvbit_get_related_functions(ctx, func);
 
@@ -313,8 +385,20 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
       }
     }
 
-    if (active_from_start && !dynamic_kernel_limit_start ||
-        dynamic_kernel_limit_start == 1)
+    // if active from start is true and dynamic_kernel_limit_start is not set, or dynamic_kernel_limit_start is 1
+    // then we need to start the active region on the first kernel.
+    //
+    // I think this is a bug in the original code, because the DYNAMIC_KERNEL_LIMIT flags are supposed to have
+    // no effect if ACTIVE_FROM_START is set to 0. So I think it should be:
+    // if (active_from_start && (!dynamic_kernel_limit_start || dynamic_kernel_limit_start == 1))
+    // currently, because of operator precedence, the condition is evaluated as:
+    // if ((active_from_start && !dynamic_kernel_limit_start) || dynamic_kernel_limit_start == 1)
+    // which is effectively:
+    // if (active_from_start && dynamic_kernel_limit_start <= 1)
+    //
+    // the issue is that ACTIVE_FROM_START is supposed to disable the DYNAMIC_KERNEL_LIMIT flags, but it doesn't.
+    // For example, if ACTIVE_FROM_START is set to 0, and DYNAMIC_KERNEL_LIMIT_START is set to 1, then the active region would start on the first kernel.
+    if (active_from_start && !dynamic_kernel_limit_start || dynamic_kernel_limit_start == 1)
       active_region = true;
     else {
       if (active_from_start)
