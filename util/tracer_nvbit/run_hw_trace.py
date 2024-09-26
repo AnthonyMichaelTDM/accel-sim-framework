@@ -53,6 +53,20 @@ parser.add_option(
     action="store_true",
     help="Once the kernel limit is reached, terminate the tracing process",
 )
+parser.add_option(
+    "-r",
+    "--kernel_regions",
+    dest="kernel_regions",
+    default="",
+    help="Only trace kernels whose ids are within these regions (comma separated), format: `start1-end1,start2-end2,...` , example: `1-10,20-30`, incompatible with the limit_kernel_number option",
+)
+parser.add_option(
+    "-f",
+    "--kernel_name_filter",
+    dest="kernel_name_filter",
+    default="",
+    help="Only trace kernels with these names (comma separated)",
+)
 
 (options, args) = parser.parse_args()
 
@@ -131,6 +145,12 @@ for bench in benchmarks:
         else:
             if options.kernel_number > 0:
                 os.environ["DYNAMIC_KERNEL_LIMIT_END"] = str(options.kernel_number)
+
+        if options.kernel_regions != "":
+            os.environ["KERNEL_REGIONS"] = options.kernel_regions
+
+        if options.kernel_name_filter != "":
+            os.environ["KERNEL_NAME_FILTER"] = options.kernel_name_filter
 
         # first we generate the traces (.trace and kernelslist files)
         # then, we do post-processing for the traces and generate (.traceg and kernelslist.g files)

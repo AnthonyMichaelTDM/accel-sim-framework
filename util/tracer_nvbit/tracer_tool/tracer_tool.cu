@@ -81,6 +81,7 @@ struct KernelRegion {
 // the kernel regions are defined in the format of start-end, and must be ordered such that the earliest range is first,
 // overlapping ranges are not allowed.
 std::vector<KernelRegion> kernel_regions;
+std::vector<std::string> kernel_names;
 
 void parse_kernel_regions(std::string raw_kernel_regions) {
   std::istringstream iss(raw_kernel_regions);
@@ -101,6 +102,14 @@ void parse_kernel_regions(std::string raw_kernel_regions) {
     region.start = std::stoull(tokens[0]);
     region.end = std::stoull(tokens[1]);
     kernel_regions.push_back(region);
+  }
+}
+
+void parse_kernel_names(std::string raw_kernel_names) {
+  std::istringstream iss(raw_kernel_names);
+  std::string token;
+  while (std::getline(iss, token, ',')) {
+    kernel_names.push_back(token);
   }
 }
 
@@ -130,6 +139,7 @@ enum address_format { list_all = 0, base_stride = 1, base_delta = 2 };
 
 void nvbit_at_init() {
   std::string raw_kernel_regions;
+  std::string kernel_name_filter;
 
   setenv("CUDA_MANAGED_FORCE_DEVICE_ALLOC", "1", 1);
   GET_VAR_INT(
@@ -149,6 +159,9 @@ void nvbit_at_init() {
               "start1-end1,start2-end2,... (inclusive). "
               "The ranges must be ordered such that the earliest range is first,"
               "and overlapping ranges are not allowed");
+  GET_VAR_STR(kernel_name_filter, "KERNEL_NAME_FILTER",
+              "List of kernel names to be traced, separated by comma."
+              "If not empty, only kernels with names in this list will be traced");
 
   GET_VAR_INT(dynamic_kernel_limit_end, "DYNAMIC_KERNEL_LIMIT_END", 0,
               "Limit of the number kernel to be printed, 0 means no limit");
@@ -197,6 +210,11 @@ void nvbit_at_init() {
                 << "Example of valid kernel regions: 1-10,20-30,40-50" << std::endl;
       exit(1);
     }
+  }
+
+  // parse the kernel names, if any
+  if (!kernel_name_filter.empty()) {
+    parse_kernel_names(kernel_name_filter);
   }
 
   if (active_from_start == 0) {
