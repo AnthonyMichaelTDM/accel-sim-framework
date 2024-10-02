@@ -78,8 +78,9 @@ struct KernelRegion {
   uint64_t start;
   uint64_t end;
 };
-// the kernel regions are defined in the format of start-end, and must be ordered such that the earliest range is first,
-// overlapping ranges are not allowed.
+// the kernel regions are defined in the format of start-end, and must be
+// ordered such that the earliest range is first, overlapping ranges are not
+// allowed.
 std::vector<KernelRegion> kernel_regions;
 std::vector<std::string> kernel_names;
 
@@ -95,7 +96,8 @@ void parse_kernel_regions(std::string raw_kernel_regions) {
         tokens.push_back(token2);
     }
     if (tokens.size() != 2) {
-      std::cerr << "Error: invalid kernel region format: " << token << std::endl;
+      std::cerr << "Error: invalid kernel region format: " << token
+                << std::endl;
       exit(1);
     }
     KernelRegion region;
@@ -132,7 +134,7 @@ bool is_in_kernel_region(int kernelid, KernelRegion &current_region) {
 
 /* kernel instruction counter, updated by the GPU */
 uint64_t dynamic_kernel_limit_start =
-    0;                                 // 0 means start from the beginning kernel
+    0; // 0 means start from the beginning kernel
 uint64_t dynamic_kernel_limit_end = 0; // 0 means no limit
 
 enum address_format { list_all = 0, base_stride = 1, base_delta = 2 };
@@ -154,12 +156,14 @@ void nvbit_at_init() {
               "The target binary must be compiled with -lineinfo or "
               "--generate-line-info");
 
-  GET_VAR_STR(raw_kernel_regions, "DYNAMIC_KERNEL_REGIONS",
+  GET_VAR_STR(
+      raw_kernel_regions, "DYNAMIC_KERNEL_REGIONS",
               "List of ranges of kernel ids to be traced, in the format of "
               "start1-end1,start2-end2,... (inclusive). "
               "The ranges must be ordered such that the earliest range is first,"
               "and overlapping ranges are not allowed");
-  GET_VAR_STR(kernel_name_filter, "KERNEL_NAME_FILTER",
+  GET_VAR_STR(
+      kernel_name_filter, "KERNEL_NAME_FILTER",
               "List of kernel names to be traced, separated by comma."
               "If not empty, only kernels with names in this list will be traced");
 
@@ -204,9 +208,12 @@ void nvbit_at_init() {
   if (!raw_kernel_regions.empty()) {
     parse_kernel_regions(raw_kernel_regions);
     if (!are_kernel_regions_valid()) {
-      std::cerr << "Error: invalid kernel regions" << std::endl
+      std::cerr
+          << "Error: invalid kernel regions" << std::endl
                 << "Invalid kernel regions: " << raw_kernel_regions << std::endl
-                << "Kernel regions must be ordered such that the earliest range is first, and overlapping ranges are not allowed" << std::endl
+          << "Kernel regions must be ordered such that the earliest range is "
+             "first, and overlapping ranges are not allowed"
+          << std::endl
                 << "Example of valid kernel regions: 1-10,20-30,40-50" << std::endl;
       exit(1);
     }
