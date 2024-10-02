@@ -147,7 +147,7 @@ for bench in benchmarks:
                 os.environ["DYNAMIC_KERNEL_LIMIT_END"] = str(options.kernel_number)
 
         if options.kernel_regions != "":
-            os.environ["KERNEL_REGIONS"] = options.kernel_regions
+            os.environ["DYNAMIC_KERNEL_REGIONS"] = options.kernel_regions
 
         if options.kernel_name_filter != "":
             os.environ["KERNEL_NAME_FILTER"] = options.kernel_name_filter
