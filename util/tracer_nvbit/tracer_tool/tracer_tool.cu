@@ -77,6 +77,8 @@ std::string stats_location = cwd + "/traces/stats.csv";
 struct KernelRegion {
   uint64_t start;
   uint64_t end;
+
+  bool check(int kernel_id) { return kernel_id >= start && kernel_id <= end; }
 };
 // the kernel regions are defined in the format of start-end, and must be
 // ordered such that the earliest range is first, overlapping ranges are not
@@ -128,8 +130,21 @@ bool are_kernel_regions_valid() {
   return true;
 }
 
-bool is_in_kernel_region(int kernelid, KernelRegion &current_region) {
-  return kernelid >= current_region.start && kernelid <= current_region.end;
+bool is_kernel_id_in_kernel_region(int kernelid) {
+  /// returns true if:
+  /// 1. there are no kernel regions defined
+  /// 2. there are kernel regions defined and the current kernel id is within
+  /// one of the kernel regions
+  if (kernel_regions.size() == 0) {
+    return true;
+  } else {
+    for (int i = 0; i < kernel_regions.size(); i++) {
+      if (kernel_regions[i].check(kernelid)) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
 /* kernel instruction counter, updated by the GPU */
@@ -158,14 +173,14 @@ void nvbit_at_init() {
 
   GET_VAR_STR(
       raw_kernel_regions, "DYNAMIC_KERNEL_REGIONS",
-              "List of ranges of kernel ids to be traced, in the format of "
-              "start1-end1,start2-end2,... (inclusive). "
-              "The ranges must be ordered such that the earliest range is first,"
-              "and overlapping ranges are not allowed");
+      "List of ranges of kernel ids to be traced, in the format of "
+      "start1-end1,start2-end2,... (inclusive). "
+      "The ranges must be ordered such that the earliest range is first,"
+      "and overlapping ranges are not allowed");
   GET_VAR_STR(
       kernel_name_filter, "KERNEL_NAME_FILTER",
-              "List of kernel names to be traced, separated by comma."
-              "If not empty, only kernels with names in this list will be traced");
+      "List of kernel names to be traced, separated by comma."
+      "If not empty, only kernels with names in this list will be traced");
 
   GET_VAR_INT(dynamic_kernel_limit_end, "DYNAMIC_KERNEL_LIMIT_END", 0,
               "Limit of the number kernel to be printed, 0 means no limit");
@@ -175,7 +190,8 @@ void nvbit_at_init() {
   GET_VAR_INT(
       active_from_start, "ACTIVE_FROM_START", 1,
       "Start instruction tracing from start or wait for cuProfilerStart "
-      "and cuProfilerStop. If set to 0, DYNAMIC_KERNEL_LIMIT options have no "
+      "and cuProfilerStop. If set to 0, DYNAMIC_KERNEL_LIMIT, "
+      "DYNAMIC_KERNEL_REGIONS, and KERNEL_NAME_FILTER options have no "
       "effect");
   GET_VAR_INT(verbose, "TOOL_VERBOSE", 0, "Enable verbosity inside the tool");
   GET_VAR_INT(enable_compress, "TOOL_COMPRESS", 1, "Enable traces compression");
@@ -191,6 +207,20 @@ void nvbit_at_init() {
               "Create xz-compressed trace"
               "file");
   std::string pad(100, '-');
+  printf("%s\n", pad.c_str());
+
+  // display more details about how the DYNAMIC_KERNEL_LIMIT flags are used in
+  // conjunction with the DYNAMIC_KERNEL_REGIONS and KERNEL_NAME_FILTER flags
+  printf("the DYNAMIC_KERNEL_LIMIT_START/END, DYNAMIC_KERNEL_REGIONS, and "
+         "KERNEL_NAME_FILTER flags are interpreted as layers of filters, "
+         "where the DYNAMIC_KERNEL_LIMIT flags are applied first, then the "
+         "DYNAMIC_KERNEL_REGIONS, and finally the KERNEL_NAME_FILTER\n\n");
+  printf("For example, if DYNAMIC_KERNEL_LIMIT_START=1, "
+         "DYNAMIC_KERNEL_LIMIT_END=5, "
+         "DYNAMIC_KERNEL_REGIONS=0-10, KERNEL_NAME_FILTER=kernel1,kernel2\n"
+         "then the tool will trace all kernels with ids in the range 1-5 "
+         "(inclusive) whose names are kernel1 or kernel2\n");
+
   printf("%s\n", pad.c_str());
 
   // detect if the user has sourced the gpgpu-sim environment, if they have then
@@ -210,11 +240,11 @@ void nvbit_at_init() {
     if (!are_kernel_regions_valid()) {
       std::cerr
           << "Error: invalid kernel regions" << std::endl
-                << "Invalid kernel regions: " << raw_kernel_regions << std::endl
+          << "Invalid kernel regions: " << raw_kernel_regions << std::endl
           << "Kernel regions must be ordered such that the earliest range is "
              "first, and overlapping ranges are not allowed"
           << std::endl
-                << "Example of valid kernel regions: 1-10,20-30,40-50" << std::endl;
+          << "Example of valid kernel regions: 1-10,20-30,40-50" << std::endl;
       exit(1);
     }
   }
@@ -420,20 +450,12 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
       }
     }
 
-    // if active from start is true and dynamic_kernel_limit_start is not set, or dynamic_kernel_limit_start is 1
-    // then we need to start the active region on the first kernel.
-    //
-    // I think this is a bug in the original code, because the DYNAMIC_KERNEL_LIMIT flags are supposed to have
-    // no effect if ACTIVE_FROM_START is set to 0. So I think it should be:
-    // if (active_from_start && (!dynamic_kernel_limit_start || dynamic_kernel_limit_start == 1))
-    // currently, because of operator precedence, the condition is evaluated as:
-    // if ((active_from_start && !dynamic_kernel_limit_start) || dynamic_kernel_limit_start == 1)
-    // which is effectively:
-    // if (active_from_start && dynamic_kernel_limit_start <= 1)
-    //
-    // the issue is that ACTIVE_FROM_START is supposed to disable the DYNAMIC_KERNEL_LIMIT flags, but it doesn't.
-    // For example, if ACTIVE_FROM_START is set to 0, and DYNAMIC_KERNEL_LIMIT_START is set to 1, then the active region would start on the first kernel.
-    if (active_from_start && !dynamic_kernel_limit_start || dynamic_kernel_limit_start == 1)
+    // if active from start is true, and dynamic_kernel_limit_start is not set
+    // or dynamic_kernel_limit_start is 1 then we need to start the active
+    // region on the first kernel.
+    if (active_from_start &&
+        (dynamic_kernel_limit_start == 0 || dynamic_kernel_limit_start == 1) &&
+        is_kernel_id_in_kernel_region(kernelid))
       active_region = true;
     else {
       if (active_from_start)
@@ -485,8 +507,10 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
     cuLaunchKernel_params *p = (cuLaunchKernel_params *)params;
 
     if (!is_exit) {
-      if (active_from_start && dynamic_kernel_limit_start &&
-          kernelid == dynamic_kernel_limit_start)
+      if (active_from_start && (kernelid >= dynamic_kernel_limit_start) &&
+          (dynamic_kernel_limit_end == 0 ||
+           kernelid <= dynamic_kernel_limit_end) &&
+          is_kernel_id_in_kernel_region(kernelid))
         active_region = true;
 
       if (terminate_after_limit_number_of_kernels_reached &&
@@ -631,8 +655,9 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
         }
       }
 
-      if (active_from_start && dynamic_kernel_limit_end &&
-          kernelid > dynamic_kernel_limit_end)
+      if (active_from_start &&
+          ((dynamic_kernel_limit_end && kernelid > dynamic_kernel_limit_end) ||
+           !is_kernel_id_in_kernel_region(kernelid)))
         active_region = false;
     }
   } else if (cbid == API_CUDA_cuProfilerStart && is_exit) {
