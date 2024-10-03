@@ -95,16 +95,17 @@ bool is_func_name_in_kernel_names(const char *func_name) {
 
 /* datastructures that support setting kernel regions of interest */
 struct KernelRegion {
-  uint64_t start;
-  uint64_t end;
+  unsigned int start;
+  unsigned int end;
 
-  bool check(int kernel_id) { return kernel_id >= start && kernel_id <= end; }
+  bool check(unsigned int kernel_id) {
+    return kernel_id >= start && kernel_id <= end;
+  }
 };
 // the kernel regions are defined in the format of start-end, and must be
 // ordered such that the earliest range is first, overlapping ranges are not
 // allowed.
 std::vector<KernelRegion> kernel_regions;
-std::vector<std::string> kernel_names;
 
 void parse_kernel_regions(std::string raw_kernel_regions) {
   std::istringstream iss(raw_kernel_regions);
@@ -138,7 +139,7 @@ void parse_kernel_names(std::string raw_kernel_names) {
 }
 
 bool are_kernel_regions_valid() {
-  for (int i = 0; i < kernel_regions.size(); i++) {
+  for (unsigned int i = 0; i < kernel_regions.size(); i++) {
     if (kernel_regions[i].start > kernel_regions[i].end) {
       return false;
     }
@@ -157,14 +158,14 @@ bool is_kernel_id_in_kernel_region(int kernelid) {
   /// one of the kernel regions
   if (kernel_regions.size() == 0) {
     return true;
-  } else {
-    for (int i = 0; i < kernel_regions.size(); i++) {
-      if (kernel_regions[i].check(kernelid)) {
-        return true;
-      }
-    }
-    return false;
   }
+  for (KernelRegion region : kernel_regions) {
+    if (region.check(kernelid)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /* kernel instruction counter, updated by the GPU */
@@ -396,8 +397,8 @@ void instrument_function_if_needed(CUcontext ctx, CUfunction func) {
           nvbit_add_call_arg_const_val32(instr, (int)instr->getSize());
         } else {
           nvbit_add_call_arg_const_val32(instr, 0);
-          nvbit_add_call_arg_const_val64(instr, -1);
-          nvbit_add_call_arg_const_val32(instr, -1);
+          nvbit_add_call_arg_const_val64(instr, (unsigned int)-1);
+          nvbit_add_call_arg_const_val32(instr, (unsigned int)-1);
         }
 
         /* reg info */
@@ -406,7 +407,7 @@ void instrument_function_if_needed(CUcontext ctx, CUfunction func) {
           nvbit_add_call_arg_const_val32(instr, src_oprd[i]);
         }
         for (int i = srcNum; i < MAX_SRC; i++) {
-          nvbit_add_call_arg_const_val32(instr, -1);
+          nvbit_add_call_arg_const_val32(instr, (unsigned int)-1);
         }
         nvbit_add_call_arg_const_val32(instr, srcNum);
 
@@ -445,7 +446,7 @@ __global__ void flush_channel() {
 static FILE *resultsFile = NULL;
 static FILE *kernelsFile = NULL;
 static FILE *statsFile = NULL;
-static int kernelid = 1;
+static unsigned int kernelid = 1;
 static bool first_call = true;
 
 unsigned old_total_insts = 0;
@@ -517,7 +518,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
       char buffer[1024];
       kernelsFile = fopen(kernelslist_location.c_str(), "a");
       sprintf(buffer, "MemcpyHtoD,0x%016llx,%lx", p->dstDevice, p->ByteCount);
-      fprintf(kernelsFile, buffer);
+      fprintf(kernelsFile, "%s", buffer);
       fprintf(kernelsFile, "\n");
       fclose(kernelsFile);
     }
@@ -613,7 +614,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
       sprintf(buffer, "kernel-%d.trace%s", kernelid,
               xz_compress_trace ? ".xz" : "");
       if (!stop_report) {
-        fprintf(kernelsFile, buffer);
+        fprintf(kernelsFile, "%s", buffer);
         fprintf(kernelsFile, "\n");
       }
       fclose(kernelsFile);
@@ -726,7 +727,7 @@ bool check_opcode_contain(const std::vector<std::string> &opcode,
 }
 
 bool base_stride_compress(const uint64_t *addrs, const std::bitset<32> &mask,
-                          uint64_t &base_addr, int &stride) {
+                          uint64_t &base_addr, unsigned int &stride) {
   // calulcate the difference between addresses
   // write cosnsctive addresses with constant stride in a more
   // compressed way (i.e. start adress and stride)
@@ -842,7 +843,7 @@ void *recv_thread_fun(void *) {
 
           bool base_stride_success = false;
           uint64_t base_addr = 0;
-          int stride = 0;
+          unsigned int stride = 0;
           std::vector<long long> deltas;
 
           if (enable_compress) {
@@ -863,7 +864,7 @@ void *recv_thread_fun(void *) {
             // base + delta format
             fprintf(resultsFile, "%u 0x%lx ", address_format::base_delta,
                     base_addr);
-            for (int s = 0; s < deltas.size(); s++) {
+            for (unsigned int s = 0; s < deltas.size(); s++) {
               fprintf(resultsFile, "%lld ", deltas[s]);
             }
           } else {
