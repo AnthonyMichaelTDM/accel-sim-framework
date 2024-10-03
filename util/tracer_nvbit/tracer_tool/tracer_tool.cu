@@ -73,6 +73,26 @@ std::string traces_location = cwd + "/traces/";
 std::string kernelslist_location = cwd + "/traces/kernelslist";
 std::string stats_location = cwd + "/traces/stats.csv";
 
+std::vector<std::string> kernel_names;
+
+bool is_func_name_in_kernel_names(const char *func_name) {
+  /// returns true if:
+  /// 1. there are no kernel names defined
+  /// 2. the list includes a kernel name that matches the current function name
+  /// (partial match)
+  if (kernel_names.size() == 0) {
+    return true;
+  } else {
+    for (auto name : kernel_names) {
+      if (strstr(func_name, name.c_str()) != NULL) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 /* datastructures that support setting kernel regions of interest */
 struct KernelRegion {
   uint64_t start;
@@ -505,17 +525,21 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
   } else if (cbid == API_CUDA_cuLaunchKernel_ptsz ||
              cbid == API_CUDA_cuLaunchKernel) {
     cuLaunchKernel_params *p = (cuLaunchKernel_params *)params;
+    const char *kernel_name = nvbit_get_func_name(ctx, p->f, true);
 
     if (!is_exit) {
       if (active_from_start && (kernelid >= dynamic_kernel_limit_start) &&
           (dynamic_kernel_limit_end == 0 ||
            kernelid <= dynamic_kernel_limit_end) &&
-          is_kernel_id_in_kernel_region(kernelid))
+          is_kernel_id_in_kernel_region(kernelid) &&
+          is_func_name_in_kernel_names(kernel_name)) {
         active_region = true;
+      }
 
       if (terminate_after_limit_number_of_kernels_reached &&
-          dynamic_kernel_limit_end != 0 &&
-          kernelid > dynamic_kernel_limit_end) {
+          ((dynamic_kernel_limit_end != 0 &&
+            kernelid > dynamic_kernel_limit_end) ||
+           kernelid > kernel_regions.back().end)) {
         exit(0);
       }
 
@@ -556,8 +580,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
           printf("Writing results to %s.xz\n", buffer);
         }
 
-        fprintf(resultsFile, "-kernel name = %s\n",
-                nvbit_get_func_name(ctx, p->f, true));
+        fprintf(resultsFile, "-kernel name = %s\n", kernel_name);
         fprintf(resultsFile, "-kernel id = %d\n", kernelid);
         fprintf(resultsFile, "-grid dim = (%d,%d,%d)\n", p->gridDimX,
                 p->gridDimY, p->gridDimZ);
