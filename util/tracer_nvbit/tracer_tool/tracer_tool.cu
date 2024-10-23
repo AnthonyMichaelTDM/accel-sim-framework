@@ -529,8 +529,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
       if (active_from_start && (ctx_kernelid[ctx] >= dynamic_kernel_limit_start) &&
           (dynamic_kernel_limit_end == 0 ||
            ctx_kernelid[ctx] <= dynamic_kernel_limit_end) &&
-          is_kernel_id_in_kernel_region(ctx_kernelid[ctx]) &&
-          is_func_name_in_kernel_names(kernel_name)) {
+          is_kernel_id_in_kernel_region(ctx_kernelid[ctx])) {
         active_region = true;
       }
 
@@ -555,7 +554,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
 
       instrument_function_if_needed(ctx, p->f);
 
-      if (active_region) {
+      if (active_region && is_func_name_in_kernel_names(kernel_name)) {
         nvbit_enable_instrumented(ctx, p->f, true);
         stop_report = false;
       } else {
