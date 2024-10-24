@@ -74,12 +74,19 @@ std::string kernelslist_location = cwd + "/traces/kernelslist";
 std::string stats_location = cwd + "/traces/stats.csv";
 
 std::vector<std::string> kernel_names;
+std::unordered_set<std::string> seen_kernel_names;
+int skip_repeat_kernel_names = 0; // false
+
+bool has_func_name_been_seen_before(const char *func_name) {
+  return !seen_kernel_names.insert(func_name).second;
+}
 
 bool is_func_name_in_kernel_names(const char *func_name) {
   /// returns true if:
   /// 1. there are no kernel names defined
   /// 2. the list includes a kernel name that matches the current function name
   /// (partial match)
+
   if (kernel_names.size() == 0) {
     return true;
   } else {
@@ -202,6 +209,9 @@ void nvbit_at_init() {
       kernel_name_filter, "KERNEL_NAME_FILTER",
       "List of kernel names to be traced, separated by comma."
       "If not empty, only kernels with names in this list will be traced");
+  
+  GET_VAR_INT(skip_repeat_kernel_names, "SKIP_REPEAT_KERNEL_NAMES", 0,
+              "Skip kernels with the same name as ones already traced");
 
   GET_VAR_INT(dynamic_kernel_limit_end, "DYNAMIC_KERNEL_LIMIT_END", 0,
               "Limit of the number kernel to be printed, 0 means no limit");
@@ -557,7 +567,8 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
 
       instrument_function_if_needed(ctx, p->f);
 
-      if (active_region && is_func_name_in_kernel_names(kernel_name)) {
+      if (active_region && is_func_name_in_kernel_names(kernel_name) && 
+          (!skip_repeat_kernel_names || !has_func_name_been_seen_before(kernel_name))) {
         nvbit_enable_instrumented(ctx, p->f, true);
         stop_report = false;
       } else {
