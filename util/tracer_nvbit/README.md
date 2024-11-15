@@ -112,3 +112,53 @@
     src_num=2  <br />
     reg_srcs=R255 R255  <br />
     mem_width = 0 (if mem_width>0, then there will be some addresses listed afterwards) <br />
+
+## Advanced Filtering options:
+
+* Filtering by kernel name:
+
+    You can filter the traces by kernel name. This is useful if you want to trace only specific kernels. To do this, set the environment variable `KERNEL_NAME_FILTER` to the kernel name you want to trace. For example:
+
+    ```bash
+    export KERNEL_NAME_FILTER=kernel_name
+    ```
+
+    you can also filter by multiple kernel names by separating them with a comma. For example:
+
+    ```bash
+    export KERNEL_NAME_FILTER=kernel_name1,kernel_name2
+    ```
+
+    This will trace only the kernels with the names `kernel_name1` and `kernel_name2`.
+
+    Note: these names can be partial matches. For example, if you set `KERNEL_NAME_FILTER=kernel`, it will trace all kernels with names that contain the word `kernel`.
+
+* Tracing disjoint kernel regions:
+
+    Like how you can trace a region of kernels using `DYNAMIC_KERNEL_LIMIT_START` and `DYNAMIC_KERNEL_LIMIT_END`, you can also trace disjoint regions of kernels. For example, to trace kernels 3,4,5 and 10,11,12, set the environment variables as below:
+
+    ```bash
+    export DYNAMIC_KERNEL_REGIONS=3-5,10-12
+    ```
+
+    This will trace kernels 3,4,5 and 10,11,12.
+
+* Skipping repeated kernels:
+
+    If you have a kernel that is called multiple times, and you want to trace only the first instance of it, you can set the environment variable `SKIP_REPEAT_KERNEL_NAMES` to 1. For example:
+
+    ```bash
+    export SKIP_REPEAT_KERNEL_NAMES=1
+    ```
+
+    This will trace only the first instance of the kernel, and skip the rest.
+
+    Note: in this case, kernel names are used to identify the kernels, and an exact match is required.
+
+Note: multiple filtering options can be used together, and they will be applied in the following order:
+
+* `DYNAMIC_KERNEL_LIMIT_START` and `DYNAMIC_KERNEL_LIMIT_END`
+* `DYNAMIC_KERNEL_REGIONS`
+* `KERNEL_NAME_FILTER`
+
+For example For example, if `DYNAMIC_KERNEL_LIMIT_START=0`, `DYNAMIC_KERNEL_LIMIT_END=5`, `DYNAMIC_KERNEL_REGIONS=1-10`, and `KERNEL_NAME_FILTER=kernel1,kernel2`, then the tool will trace all kernels with ids in the range 1-5 (inclusive) whose names include `kernel1` or `kernel2`.

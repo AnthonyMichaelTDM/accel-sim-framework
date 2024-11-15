@@ -67,6 +67,13 @@ parser.add_option(
     default="",
     help="Only trace kernels with these names (comma separated)",
 )
+parser.add_option(
+    "-s",
+    "--skip_repeat_kernels"
+    dest="skip_repeat_kernels",
+    action="store_true",
+    help="Skip kernels with the same name as ones already traced",
+)
 
 (options, args) = parser.parse_args()
 
@@ -151,6 +158,9 @@ for bench in benchmarks:
 
         if options.kernel_name_filter != "":
             os.environ["KERNEL_NAME_FILTER"] = options.kernel_name_filter
+
+        if options.skip_repeat_kernels:
+            os.environ["SKIP_REPEAT_KERNEL_NAMES"] = "1"
 
         # first we generate the traces (.trace and kernelslist files)
         # then, we do post-processing for the traces and generate (.traceg and kernelslist.g files)
