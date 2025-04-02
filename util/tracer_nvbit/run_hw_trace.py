@@ -69,7 +69,7 @@ parser.add_option(
 )
 parser.add_option(
     "-s",
-    "--skip_repeat_kernels"
+    "--skip_repeat_kernels",
     dest="skip_repeat_kernels",
     action="store_true",
     help="Skip kernels with the same name as ones already traced",
