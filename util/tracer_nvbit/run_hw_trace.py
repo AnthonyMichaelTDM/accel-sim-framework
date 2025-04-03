@@ -3,18 +3,10 @@
 from optparse import OptionParser
 import os
 import subprocess
-import os
 this_directory = os.path.dirname(os.path.realpath(__file__)) + "/"
 import sys
 sys.path.insert(0,os.path.join(this_directory,"..","job_launching"))
 import common
-import re
-import shutil
-import glob
-import datetime
-import yaml
-import common
-import re
 import datetime
 
 # We will look for the benchmarks 
@@ -52,9 +44,21 @@ for bench in benchmarks:
     edir, ddir, exe, argslist = bench
     for argpair in argslist:
         args = argpair["args"]
-        run_name = os.path.join( exe, common.get_argfoldername( args ) )
-        this_run_dir = os.path.abspath(os.path.expandvars(
-            os.path.join(this_directory, "..", "..", "hw_run","traces","device-" + options.device_num, cuda_version, run_name)))
+        run_name = os.path.join(exe.replace("/", "_"), common.get_argfoldername(args))
+        this_run_dir = os.path.abspath(
+            os.path.expandvars(
+                os.path.join(
+                    this_directory,
+                    "..",
+                    "..",
+                    "hw_run",
+                    "traces",
+                    "device-" + options.device_num,
+                    cuda_version,
+                    run_name,
+                )
+            )
+        )
         this_trace_folder = os.path.join(this_run_dir, "traces")
         if not os.path.exists(this_run_dir):
             os.makedirs(this_run_dir)
@@ -63,7 +67,9 @@ for bench in benchmarks:
 
         # link the data directory
         try:
-            benchmark_data_dir = common.dir_option_test(os.path.join(ddir,exe,"data"),"",this_directory)
+            benchmark_data_dir = common.dir_option_test(
+                os.path.join(ddir, exe.replace("/", "_"), "data"), "", this_directory
+            )
             if os.path.lexists(os.path.join(this_run_dir, "data")):
                 os.remove(os.path.join(this_run_dir, "data"))
             os.symlink(benchmark_data_dir, os.path.join(this_run_dir,"data"))
