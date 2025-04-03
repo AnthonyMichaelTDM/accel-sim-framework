@@ -162,7 +162,7 @@ class ConfigurationSpec:
                             "Job "
                             + torque_out
                             + " queued ("
-                            + benchmark
+                            + benchmark.replace("/", "_")
                             + "-"
                             + self.benchmark_args_subdirs[args]
                             + " "
@@ -200,7 +200,7 @@ class ConfigurationSpec:
                             % (
                                 time_string,
                                 torque_out,
-                                benchmark,
+                                benchmark.replace("/", "_"),
                                 self.benchmark_args_subdirs[args],
                                 self.run_subdir,
                                 build_handle,
@@ -353,8 +353,13 @@ class ConfigurationSpec:
             queue_name = os.getenv("TORQUE_QUEUE_NAME")
 
         # do the text replacement for the .sim file
-        sim_name = benchmark + "-" + self.benchmark_args_subdirs[command_line_args] + "." +\
-                                gpgpusim_build_handle
+        sim_name = (
+            benchmark.replace("/", "_")
+            + "-"
+            + self.benchmark_args_subdirs[command_line_args]
+            + "."
+            + gpgpusim_build_handle
+        )
         # Truncate long simulation file names
         sim_name = sim_name[:200]
         replacement_dict = {"NAME":sim_name,
@@ -390,7 +395,7 @@ class ConfigurationSpec:
                 "$GPUAPPS_ROOT",
                 "benchmarks",
                 "app-specific-gpgpu-sim-options",
-                bench_name,
+                bench_name.replace("/", "_"),
                 "benchmark_options.txt",
             )
         )
