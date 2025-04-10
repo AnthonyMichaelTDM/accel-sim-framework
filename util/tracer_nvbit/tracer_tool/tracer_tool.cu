@@ -306,8 +306,6 @@ std::unordered_set<CUfunction> already_instrumented;
 /* instrument each memory instruction adding a call to the above instrumentation
  * function */
 void instrument_function_if_needed(CUcontext ctx, CUfunction func) {
-  printf("Instrumenting function");
-
   std::vector<CUfunction> related_functions =
       nvbit_get_related_functions(ctx, func);
 
