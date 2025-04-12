@@ -2,14 +2,14 @@ moca:
     exec_dir: /shared/models
     data_dirs: /shared/models/data
     execs:
-        # - alexnet/alexnet_dummy.py:
-        #     - args: --device cuda --batch_size 1 --max_iters 1
-        # - bert/bert_train.py:
-            # - args: --device cuda --batch_size 1 --max_iters 1
+        - alexnet/alexnet_dummy.py:
+            - args: --device cuda --batch_size 1 --max_iters 1
+        - bert/bert_train.py:
+            - args: --batch_size 1 --max_iters 1
         - mnist/mnist_dummy.py:
             - args: --device cuda --batch_size 1 --max_iters 2
-        # - resnet/resnet_dummy.py:
-        #     - args: --device cuda --batch_size 1 --max_iters 1
+        - resnet/resnet_dummy.py:
+            - args: --device cuda --batch_size 1 --max_iters 1
         # - whisper/whisper_dummy.py:
         #     - args: --device cuda --batch_size 1 --max_iters 1
         # - model_pool_finetuned.py:
