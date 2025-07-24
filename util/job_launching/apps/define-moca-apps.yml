@@ -14,3 +14,5 @@ moca:
         #     - args: --device cuda --batch_size 1 --max_iters 1
         # - model_pool_finetuned.py:
         #     - args: --pre_train_name=bert-base-uncased --finetune_name=victoraavila/bert-base-uncased-finetuned-squad --sentence=1
+        - gpt-2/gpt2-train.py:
+            - args: --batch_size 1 --max_iters 1
